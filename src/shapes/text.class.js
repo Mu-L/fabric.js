@@ -197,6 +197,22 @@
     shadow:               null,
 
     /**
+     * fabric.Path that the text can follow.
+     * This feature is in BETA.
+     * @type fabric.Path
+     * @default
+     */
+    path:               null,
+
+    /**
+     * Offset amount for text path starting position
+     * Only used when text has a path
+     * @type Number
+     * @default
+     */
+    startOffset:               0,
+
+    /**
      * @private
      */
     _fontSizeFraction: 0.222,
@@ -249,6 +265,19 @@
      * @default
      */
     deltaY: 0,
+
+    /**
+     * WARNING: EXPERIMENTAL. NOT SUPPORTED YET
+     * determine the direction of the text.
+     * This has to be set manually together with textAlign and originX for proper
+     * experience.
+     * some interesting link for the future
+     * https://www.w3.org/International/questions/qa-bidi-unicode-controls
+     * @since 4.5.0
+     * @type {String} 'ltr|rtl'
+     * @default
+     */
+    direction: 'ltr',
 
     /**
      * Array of properties that define a style unit (of 'styles').
@@ -544,7 +573,8 @@
           line, lastColor,
           leftOffset = this._getLeftOffset(),
           lineTopOffset = this._getTopOffset(),
-          boxStart = 0, boxWidth = 0, charBox, currentColor, path = this.path;
+          boxStart = 0, boxWidth = 0, charBox, currentColor, path = this.path,
+          drawStart;
 
       for (var i = 0, len = this._textLines.length; i < len; i++) {
         heightOfLine = this.getHeightOfLine(i);
@@ -574,9 +604,13 @@
             ctx.restore();
           }
           else if (currentColor !== lastColor) {
+            drawStart = leftOffset + lineLeftOffset + boxStart;
+            if (this.direction === 'rtl') {
+              drawStart = this.width - drawStart - boxWidth;
+            }
             ctx.fillStyle = lastColor;
             lastColor && ctx.fillRect(
-              leftOffset + lineLeftOffset + boxStart,
+              drawStart,
               lineTopOffset,
               boxWidth,
               heightOfLine / this.lineHeight
@@ -590,9 +624,13 @@
           }
         }
         if (currentColor && !path) {
+          drawStart = leftOffset + lineLeftOffset + boxStart;
+          if (this.direction === 'rtl') {
+            drawStart = this.width - drawStart - boxWidth;
+          }
           ctx.fillStyle = currentColor;
           ctx.fillRect(
-            leftOffset + lineLeftOffset + boxStart,
+            drawStart,
             lineTopOffset,
             boxWidth,
             heightOfLine / this.lineHeight
@@ -714,26 +752,11 @@
           positionInPath = 0, startingPoint, totalPathLength, path = this.path;
 
       this.__charBounds[lineIndex] = lineBounds;
-      if (path) {
-        startingPoint = fabric.util.getPointOnPath(path.path, 0, path.segmentsInfo);
-        totalPathLength = path.segmentsInfo[path.segmentsInfo.length - 1].length;
-        startingPoint.x += path.pathOffset.x;
-        startingPoint.y += path.pathOffset.y;
-      }
       for (i = 0; i < line.length; i++) {
         grapheme = line[i];
         graphemeInfo = this._getGraphemeBox(grapheme, lineIndex, i, prevGrapheme);
-        if (path) {
-          if (positionInPath > totalPathLength) {
-            positionInPath %= totalPathLength;
-          }
-          // it would probably much fater to send all the grapheme position for a line
-          // and calculate path position/angle at once.
-          this._setGraphemeOnPath(positionInPath, graphemeInfo, startingPoint);
-        }
         lineBounds[i] = graphemeInfo;
         width += graphemeInfo.kernedWidth;
-        positionInPath += graphemeInfo.kernedWidth;
         prevGrapheme = grapheme;
       }
       // this latest bound box represent the last character of the line
@@ -744,6 +767,37 @@
         kernedWidth: 0,
         height: this.fontSize
       };
+      if (path) {
+        totalPathLength = path.segmentsInfo[path.segmentsInfo.length - 1].length;
+        startingPoint = fabric.util.getPointOnPath(path.path, 0, path.segmentsInfo);
+        startingPoint.x += path.pathOffset.x;
+        startingPoint.y += path.pathOffset.y;
+        switch (this.textAlign) {
+          case 'center':
+            positionInPath = (totalPathLength - width) / 2;
+            break;
+          case 'right':
+            positionInPath = (totalPathLength - width);
+            break;
+          //todo - add support for justify
+        }
+        positionInPath += this.startOffset;
+      }
+      if (path) {
+        for (i = 0; i < line.length; i++) {
+          graphemeInfo = lineBounds[i];
+          if (positionInPath > totalPathLength) {
+            positionInPath %= totalPathLength;
+          }
+          else if (positionInPath < 0) {
+            positionInPath += totalPathLength;
+          }
+          // it would probably much faster to send all the grapheme position for a line
+          // and calculate path position/angle at once.
+          this._setGraphemeOnPath(positionInPath, graphemeInfo, startingPoint);
+          positionInPath += graphemeInfo.kernedWidth;
+        }
+      }
       return { width: width, numOfSpaces: numOfSpaces };
     },
 
@@ -840,7 +894,7 @@
      * @return {Number} Left offset
      */
     _getLeftOffset: function() {
-      return -this.width / 2;
+      return this.direction === 'ltr' ? -this.width / 2 : this.width / 2;
     },
 
     /**
@@ -929,12 +983,18 @@
           boxWidth = 0,
           timeToRender,
           path = this.path,
-          shortCut = !isJustify && this.charSpacing === 0 && this.isEmptyStyles(lineIndex) && !path;
+          shortCut = !isJustify && this.charSpacing === 0 && this.isEmptyStyles(lineIndex) && !path,
+          isLtr = this.direction === 'ltr', sign = this.direction === 'ltr' ? 1 : -1,
+          drawingLeft;
 
       ctx.save();
       top -= lineHeight * this._fontSizeFraction / this.lineHeight;
       if (shortCut) {
         // render all the line in one pass without checking
+        // drawingLeft = isLtr ? left : left - this.getLineWidth(lineIndex);
+        ctx.canvas.setAttribute('dir', isLtr ? 'ltr' : 'rtl');
+        ctx.direction = isLtr ? 'ltr' : 'rtl';
+        ctx.textAlign = isLtr ? 'left' : 'right';
         this._renderChar(method, ctx, lineIndex, 0, line.join(''), left, top, lineHeight);
         ctx.restore();
         return;
@@ -944,7 +1004,7 @@
         charsToRender += line[i];
         charBox = this.__charBounds[lineIndex][i];
         if (boxWidth === 0) {
-          left += charBox.kernedWidth - charBox.width;
+          left += sign * (charBox.kernedWidth - charBox.width);
           boxWidth += charBox.width;
         }
         else {
@@ -970,11 +1030,15 @@
             ctx.restore();
           }
           else {
-            this._renderChar(method, ctx, lineIndex, i, charsToRender, left, top, lineHeight);
+            drawingLeft = left;
+            ctx.canvas.setAttribute('dir', isLtr ? 'ltr' : 'rtl');
+            ctx.direction = isLtr ? 'ltr' : 'rtl';
+            ctx.textAlign = isLtr ? 'left' : 'right';
+            this._renderChar(method, ctx, lineIndex, i, charsToRender, drawingLeft, top, lineHeight);
           }
           charsToRender = '';
           actualStyle = nextStyle;
-          left += boxWidth;
+          left += sign * boxWidth;
           boxWidth = 0;
         }
       }
@@ -1011,7 +1075,7 @@
     handleFiller: function(ctx, property, filler) {
       var offsetX, offsetY;
       if (filler.toLive) {
-        if (filler.gradientUnits === 'percentage' || filler.gradientTrasnform || filler.patternTransform) {
+        if (filler.gradientUnits === 'percentage' || filler.gradientTransform || filler.patternTransform) {
           // need to transform gradient in a pattern.
           // this is a slow process. If you are hitting this codepath, and the object
           // is not using caching, you should consider switching it on.
@@ -1162,20 +1226,32 @@
      * @return {Number} Line left offset
      */
     _getLineLeftOffset: function(lineIndex) {
-      var lineWidth = this.getLineWidth(lineIndex);
-      if (this.textAlign === 'center') {
-        return (this.width - lineWidth) / 2;
+      var lineWidth = this.getLineWidth(lineIndex),
+          lineDiff = this.width - lineWidth, textAlign = this.textAlign, direction = this.direction,
+          isEndOfWrapping, leftOffset = 0, isEndOfWrapping = this.isEndOfWrapping(lineIndex);
+      if (textAlign === 'justify'
+        || (textAlign === 'justify-center' && !isEndOfWrapping)
+        || (textAlign === 'justify-right' && !isEndOfWrapping)
+        || (textAlign === 'justify-left' && !isEndOfWrapping)
+      ) {
+        return 0;
       }
-      if (this.textAlign === 'right') {
-        return this.width - lineWidth;
+      if (textAlign === 'center') {
+        leftOffset = lineDiff / 2;
       }
-      if (this.textAlign === 'justify-center' && this.isEndOfWrapping(lineIndex)) {
-        return (this.width - lineWidth) / 2;
+      if (textAlign === 'right') {
+        leftOffset = lineDiff;
       }
-      if (this.textAlign === 'justify-right' && this.isEndOfWrapping(lineIndex)) {
-        return this.width - lineWidth;
+      if (textAlign === 'justify-center') {
+        leftOffset = lineDiff / 2;
       }
-      return 0;
+      if (textAlign === 'justify-right') {
+        leftOffset = lineDiff;
+      }
+      if (direction === 'rtl') {
+        leftOffset -= lineDiff;
+      }
+      return leftOffset;
     },
 
     /**
@@ -1262,7 +1338,8 @@
           topOffset = this._getTopOffset(), top,
           boxStart, boxWidth, charBox, currentDecoration,
           maxHeight, currentFill, lastFill, path = this.path,
-          charSpacing = this._getWidthOfCharSpacing();
+          charSpacing = this._getWidthOfCharSpacing(),
+          offsetY = this.offsets[type];
 
       for (var i = 0, len = this._textLines.length; i < len; i++) {
         heightOfLine = this.getHeightOfLine(i);
@@ -1293,7 +1370,7 @@
             ctx.rotate(charBox.angle);
             ctx.fillRect(
               -charBox.kernedWidth / 2,
-              this.offsets[type] * _size + _dy,
+              offsetY * _size + _dy,
               charBox.kernedWidth,
               this.fontSize / 15
             );
@@ -1303,13 +1380,19 @@
             (currentDecoration !== lastDecoration || currentFill !== lastFill || _size !== size || _dy !== dy)
             && boxWidth > 0
           ) {
-            lastDecoration && lastFill &&
+            var drawStart = leftOffset + lineLeftOffset + boxStart;
+            if (this.direction === 'rtl') {
+              drawStart = this.width - drawStart - boxWidth;
+            }
+            if (lastDecoration && lastFill) {
+              ctx.fillStyle = lastFill;
               ctx.fillRect(
-                leftOffset + lineLeftOffset + boxStart,
-                top + this.offsets[type] * size + dy,
+                drawStart,
+                top + offsetY * size + dy,
                 boxWidth,
                 this.fontSize / 15
               );
+            }
             boxStart = charBox.left;
             boxWidth = charBox.width;
             lastDecoration = currentDecoration;
@@ -1321,10 +1404,14 @@
             boxWidth += charBox.kernedWidth;
           }
         }
+        var drawStart = leftOffset + lineLeftOffset + boxStart;
+        if (this.direction === 'rtl') {
+          drawStart = this.width - drawStart - boxWidth;
+        }
         ctx.fillStyle = currentFill;
         currentDecoration && currentFill && ctx.fillRect(
-          leftOffset + lineLeftOffset + boxStart,
-          top + this.offsets[type] * size + dy,
+          drawStart,
+          top + offsetY * size + dy,
           boxWidth - charSpacing,
           this.fontSize / 15
         );
@@ -1412,9 +1499,12 @@
         'textAlign',
         'textBackgroundColor',
         'charSpacing',
+        'path',
+        'direction',
       ].concat(propertiesToInclude);
       var obj = this.callSuper('toObject', additionalProperties);
       obj.styles = clone(this.styles, true);
+      obj.path = this.path && this.path.toObject();
       return obj;
     },
 
@@ -1570,11 +1660,23 @@
    * Returns fabric.Text instance from an object representation
    * @static
    * @memberOf fabric.Text
-   * @param {Object} object Object to create an instance from
+   * @param {Object} object plain js Object to create an instance from
    * @param {Function} [callback] Callback to invoke when an fabric.Text instance is created
    */
   fabric.Text.fromObject = function(object, callback) {
-    return fabric.Object._fromObject('Text', object, callback, 'text');
+    var objectCopy = clone(object), path = object.path;
+    delete objectCopy.path;
+    return fabric.Object._fromObject('Text', objectCopy, function(textInstance) {
+      if (path) {
+        fabric.Object._fromObject('Path', path, function(pathInstance) {
+          textInstance.set('path', pathInstance);
+          callback(textInstance);
+        }, 'path');
+      }
+      else {
+        callback(textInstance);
+      }
+    }, 'text');
   };
 
   fabric.Text.genericFonts = ['sans-serif', 'serif', 'cursive', 'fantasy', 'monospace'];

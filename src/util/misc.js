@@ -115,8 +115,8 @@
      * @return {fabric.Point} The new rotated point
      */
     rotatePoint: function(point, origin, radians) {
-      point.subtractEquals(origin);
-      var v = fabric.util.rotateVector(point, radians);
+      var newPoint = new fabric.Point(point.x - origin.x, point.y - origin.y),
+          v = fabric.util.rotateVector(newPoint, radians);
       return new fabric.Point(v.x, v.y).addEquals(origin);
     },
 
@@ -543,6 +543,8 @@
     },
 
     /**
+     * WARNING: THIS WAS TO SUPPORT OLD BROWSERS. deprecated.
+     * WILL BE REMOVED IN FABRIC 5.0
      * Draws a dashed line between two points
      *
      * This method is used to draw dashed line around selection area.
@@ -554,6 +556,7 @@
      * @param {Number} x2 end x coordinate
      * @param {Number} y2 end y coordinate
      * @param {Array} da dash array pattern
+     * @deprecated
      */
     drawDashedLine: function(ctx, x, y, x2, y2, da) {
       var dx = x2 - x,
@@ -967,6 +970,59 @@
       return 'matrix(' + transform.map(function(value) {
         return fabric.util.toFixed(value, fabric.Object.NUM_FRACTION_DIGITS);
       }).join(' ') + ')';
+    },
+
+    /**
+     * given an object and a transform, apply the inverse transform to the object,
+     * this is equivalent to remove from that object that transformation, so that
+     * added in a space with the removed transform, the object will be the same as before.
+     * Removing from an object a transform that scale by 2 is like scaling it by 1/2.
+     * Removing from an object a transfrom that rotate by 30deg is like rotating by 30deg
+     * in the opposite direction.
+     * This util is used to add objects inside transformed groups or nested groups.
+     * @memberOf fabric.util
+     * @param {fabric.Object} object the object you want to transform
+     * @param {Array} transform the destination transform
+     */
+    removeTransformFromObject: function(object, transform) {
+      var inverted = fabric.util.invertTransform(transform),
+          finalTransform = fabric.util.multiplyTransformMatrices(inverted, object.calcOwnMatrix());
+      fabric.util.applyTransformToObject(object, finalTransform);
+    },
+
+    /**
+     * given an object and a transform, apply the transform to the object.
+     * this is equivalent to change the space where the object is drawn.
+     * Adding to an object a transform that scale by 2 is like scaling it by 2.
+     * This is used when removing an object from an active selection for example.
+     * @memberOf fabric.util
+     * @param {fabric.Object} object the object you want to transform
+     * @param {Array} transform the destination transform
+     */
+    addTransformToObject: function(object, transform) {
+      fabric.util.applyTransformToObject(
+        object,
+        fabric.util.multiplyTransformMatrices(transform, object.calcOwnMatrix())
+      );
+    },
+
+    /**
+     * discard an object transform state and apply the one from the matrix.
+     * @memberOf fabric.util
+     * @param {fabric.Object} object the object you want to transform
+     * @param {Array} transform the destination transform
+     */
+    applyTransformToObject: function(object, transform) {
+      var options = fabric.util.qrDecompose(transform),
+          center = new fabric.Point(options.translateX, options.translateY);
+      object.flipX = false;
+      object.flipY = false;
+      object.set('scaleX', options.scaleX);
+      object.set('scaleY', options.scaleY);
+      object.skewX = options.skewX;
+      object.skewY = options.skewY;
+      object.angle = options.angle;
+      object.setPositionByOrigin(center, 'center', 'center');
     },
 
     /**

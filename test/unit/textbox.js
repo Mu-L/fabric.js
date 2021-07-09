@@ -52,7 +52,9 @@
     styles: { },
     minWidth: 20,
     splitByGrapheme: false,
-    strokeUniform: false
+    strokeUniform: false,
+    path: null,
+    direction: 'ltr',
   };
 
   QUnit.test('constructor', function(assert) {
