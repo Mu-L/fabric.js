@@ -1,5 +1,12 @@
 import { defineConfig } from 'vitest/config';
-import path from 'node:path';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const fixturesPath = path.resolve(__dirname, 'test/fixtures');
+let fixturesUrl = pathToFileURL(fixturesPath).href;
+if (!fixturesUrl.endsWith('/')) {
+  fixturesUrl += '/';
+}
 
 export default defineConfig({
   resolve: {
@@ -8,8 +15,9 @@ export default defineConfig({
     },
   },
   test: {
-    pool: 'threads',
+    pool: 'vmThreads',
     clearMocks: true,
+    mockReset: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: [
@@ -18,6 +26,12 @@ export default defineConfig({
       'extensions/**/*.spec.{ts,tsx}',
       'extensions/**/*.test.{ts,tsx}',
     ],
+    environmentOptions: {
+      jsdom: {
+        resources: 'usable',
+        url: fixturesUrl,
+      },
+    },
     coverage: {
       reportsDirectory: '.nyc_output',
       reporter: ['json'],
