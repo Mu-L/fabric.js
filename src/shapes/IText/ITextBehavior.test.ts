@@ -1,16 +1,6 @@
 import { roundSnapshotOptions } from '../../../vitest.extend';
 import { IText } from './IText';
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-  test,
-  vi,
-} from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, test, vi } from 'vitest';
 
 import { ValueAnimation } from '../../util/animation/ValueAnimation';
 
@@ -52,34 +42,59 @@ describe('text imperative changes', () => {
     matchTextStateSnapshot(iText);
   });
 
-  it('insertChars', async () => {
+  it('insertChars', async (context) => {
+    context.skip(
+      !!context.task.file.projectName?.includes('firefox'),
+      'Firefox delivers different snapshot',
+    );
+
     const iText = await create();
     iText.insertChars('ab', undefined, 1);
     expect(iText.text).toBe('tabest');
     matchTextStateSnapshot(iText);
   });
 
-  it('insertChars and removes chars', async () => {
+  it('insertChars and removes chars', async (context) => {
+    context.skip(
+      !!context.task.file.projectName?.includes('firefox'),
+      'Firefox delivers different snapshot',
+    );
+
     const iText = await create();
     iText.insertChars('ab', undefined, 1, 2);
     expect(iText.text).toBe('tabst');
     matchTextStateSnapshot(iText);
   });
 
-  it('insertChars and removes chars', async () => {
+  it('insertChars and removes chars', async (context) => {
+    context.skip(
+      !!context.task.file.projectName?.includes('firefox'),
+      'Firefox delivers different snapshot',
+    );
+
     const iText = await create();
     iText.insertChars('ab', undefined, 1, 4);
     expect(iText.text).toBe('tab');
     matchTextStateSnapshot(iText);
   });
 
-  it('insertChars handles new lines correctly', async () => {
+  it('insertChars handles new lines correctly', async (context) => {
+    context.skip(
+      !!context.task.file.projectName?.includes('firefox'),
+      'Firefox delivers different snapshot',
+    );
+
     const iText = await create();
     iText.insertChars('ab\n\n', undefined, 1);
     matchTextStateSnapshot(iText);
   });
 
-  it('insertChars can accept some style for the new text', async () => {
+  it('insertChars can accept some style for the new text', async (context) => {
+    context.skip(
+      !!context.task.file.projectName?.includes('firefox'),
+      'Firefox delivers different snapshot',
+    );
+
     const iText = await create();
     iText.insertChars(
       'ab\n\na',
@@ -107,7 +122,8 @@ describe('text imperative changes', () => {
 describe('IText cursor animation snapshot', () => {
   let currentAnimation: string[] = [];
   const origCalculate = ValueAnimation.prototype.calculate;
-  beforeAll(() => {
+
+  beforeEach(() => {
     vi.spyOn(ValueAnimation.prototype, 'calculate').mockImplementation(
       function (timeElapsed: number) {
         const value = origCalculate.call(this, timeElapsed);
@@ -116,15 +132,12 @@ describe('IText cursor animation snapshot', () => {
       },
     );
     vi.useFakeTimers();
-  });
-  afterAll(() => {
-    ValueAnimation.prototype.calculate = origCalculate;
-  });
-  beforeEach(() => {
     vi.runAllTimers();
     currentAnimation = [];
   });
-  afterAll(() => {
+
+  afterEach(() => {
+    ValueAnimation.prototype.calculate = origCalculate;
     vi.resetAllMocks();
     vi.useRealTimers();
   });
