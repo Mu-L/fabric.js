@@ -19,16 +19,8 @@ import {
   Path,
   version,
 } from '../../fabric';
-
-vi.mock('../util/misc/objectEnlive', async (importOriginal) => ({
-  ...(await importOriginal()),
-  loadImage: vi.fn().mockImplementation(() => {
-    const img = globalThis.document.createElement('img');
-    img.width = 100;
-    img.height = 100;
-    return Promise.resolve(img);
-  }),
-}));
+import TEST_IMAGE from '../../test/fixtures/test_image.gif';
+import { isJSDOM } from '../../vitest.extend';
 
 const EMPTY_JSON = '{"version":"' + version + '","objects":[]}';
 
@@ -140,15 +132,15 @@ describe('Canvas', () => {
       const canvas = new Canvas(undefined, {
         allowTouchScrolling: false,
       });
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evt = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       evt.preventDefault = vi.fn();
       canvas._onTouchStart(evt);
@@ -158,15 +150,15 @@ describe('Canvas', () => {
       const canvas = new Canvas(undefined, {
         allowTouchScrolling: true,
       });
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evt = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       evt.preventDefault = vi.fn();
       canvas._onTouchStart(evt);
@@ -177,15 +169,15 @@ describe('Canvas', () => {
         allowTouchScrolling: true,
         isDrawingMode: true,
       });
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evt = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       evt.preventDefault = vi.fn();
       canvas._onTouchStart(evt);
@@ -203,15 +195,15 @@ describe('Canvas', () => {
       });
       canvas.add(rect);
       canvas.setActiveObject(rect);
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evt = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       evt.preventDefault = vi.fn();
       canvas._onTouchStart(evt);
@@ -229,40 +221,40 @@ describe('Canvas', () => {
       });
       canvas.add(rect);
       canvas.setActiveObject(rect);
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evt = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       evt.preventDefault = vi.fn();
       canvas._onTouchStart(evt);
       expect(evt.preventDefault).not.toHaveBeenCalled();
     });
     test('dispose after _onTouchStart', () => {
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
       const canvas = new Canvas(undefined, {
         allowTouchScrolling: true,
         isDrawingMode: true,
       });
-      const touch = {
+      const touch = new Touch({
         clientX: 10,
         clientY: 0,
         identifier: 1,
         target: canvas.upperCanvasEl,
-      };
+      });
       const evtStart = new TouchEvent('touchstart', {
-        touches: [touch as unknown as Touch],
-        changedTouches: [touch as unknown as Touch],
+        touches: [touch],
+        changedTouches: [touch],
       });
       canvas._onTouchStart(evtStart);
       const evtEnd = new TouchEvent('touchend', {
         touches: [],
-        changedTouches: [touch as unknown as Touch],
+        changedTouches: [touch],
       });
       canvas._onTouchEnd(evtEnd);
       // @ts-expect-error -- private method
@@ -366,7 +358,7 @@ describe('Canvas', () => {
 
   it('preserveObjectStacking property', () => {
     expect(canvas.preserveObjectStacking).toBeTypeOf('boolean');
-    expect(canvas.preserveObjectStacking, 'default is false').toBeFalsy();
+    expect(canvas.preserveObjectStacking, 'default is true').toBeTruthy();
   });
 
   it('uniformScaling property', () => {
@@ -425,7 +417,7 @@ describe('Canvas', () => {
 
   it('implements _chooseObjectsToRender method', () => {
     expect(canvas._chooseObjectsToRender).toBeTypeOf('function');
-
+    canvas.preserveObjectStacking = false;
     const rect = makeRect(),
       rect2 = makeRect(),
       rect3 = makeRect();
@@ -1227,17 +1219,6 @@ describe('Canvas', () => {
     );
   });
 
-  it('implements getCenter method that returns canvas center', () => {
-    expect(canvas.getCenter).toBeTypeOf('function');
-    const center = canvas.getCenter();
-    expect(center.left, 'center left is half width').toBe(
-      upperCanvasEl.width / 2,
-    );
-    expect(center.top, 'center top is half height').toBe(
-      upperCanvasEl.height / 2,
-    );
-  });
-
   it('implements getCenterPoint method that returns canvas center as Point', () => {
     expect(canvas.getCenterPoint).toBeTypeOf('function');
     const center = canvas.getCenterPoint();
@@ -1701,7 +1682,7 @@ describe('Canvas', () => {
           globalCompositeOperation: 'source-over',
           skewX: 0,
           skewY: 0,
-          src: '../../test/fixtures/test_image.gif',
+          src: isJSDOM() ? 'test_image.gif' : TEST_IMAGE,
           filters: [],
           crossOrigin: '',
         },
@@ -1712,7 +1693,7 @@ describe('Canvas', () => {
     // @ts-expect-error -- custom prop
     serialized.controlsAboveOverlay = true;
     // @ts-expect-error -- custom prop
-    serialized.preserveObjectStacking = true;
+    serialized.preserveObjectStacking = false;
 
     expect(canvas.controlsAboveOverlay).toBe(
       Canvas.getDefaults().controlsAboveOverlay,
@@ -1723,13 +1704,13 @@ describe('Canvas', () => {
 
     // before callback the properties are still false.
     expect(canvas.controlsAboveOverlay).toBe(false);
-    expect(canvas.preserveObjectStacking).toBe(false);
+    expect(canvas.preserveObjectStacking).toBe(true);
 
     await canvas.loadFromJSON(serialized);
 
     expect(canvas.isEmpty(), 'canvas is not empty').toBeFalsy();
     expect(canvas.controlsAboveOverlay).toBe(true);
-    expect(canvas.preserveObjectStacking).toBe(true);
+    expect(canvas.preserveObjectStacking).toBe(false);
   });
 
   // TODO: does this test makes sense in vitest?
@@ -2191,7 +2172,7 @@ describe('Canvas', () => {
     expect(canvas.getWidth).toBeTypeOf('function');
     expect(canvas.getWidth()).toBe(600);
 
-    canvas.setWidth(444);
+    canvas.setDimensions({ width: 444 });
     expect(canvas.getWidth()).toBe(444);
     expect(canvas.lowerCanvasEl.style.width).toBe('444px');
   });
@@ -2200,14 +2181,14 @@ describe('Canvas', () => {
     expect(canvas.getHeight).toBeTypeOf('function');
     expect(canvas.getHeight()).toBe(600);
 
-    canvas.setHeight(765);
+    canvas.setDimensions({ height: 765 });
     expect(canvas.getHeight()).toBe(765);
     expect(canvas.lowerCanvasEl.style.height).toBe('765px');
   });
 
   it('sets width with cssOnly option', () => {
-    canvas.setWidth(123);
-    canvas.setWidth('100%', { cssOnly: true });
+    canvas.setDimensions({ width: 123 });
+    canvas.setDimensions({ width: '100%' }, { cssOnly: true });
 
     expect(
       canvas.lowerCanvasEl.style.width,
@@ -2225,8 +2206,8 @@ describe('Canvas', () => {
   });
 
   it('sets height with cssOnly option', () => {
-    canvas.setHeight(123);
-    canvas.setHeight('100%', { cssOnly: true });
+    canvas.setDimensions({ height: 123 });
+    canvas.setDimensions({ height: '100%' }, { cssOnly: true });
 
     expect(
       canvas.lowerCanvasEl.style.height,
@@ -2246,8 +2227,8 @@ describe('Canvas', () => {
   });
 
   it('sets width with backstoreOnly option', () => {
-    canvas.setWidth(123);
-    canvas.setWidth(500, { backstoreOnly: true });
+    canvas.setDimensions({ width: 123 });
+    canvas.setDimensions({ width: 500 }, { backstoreOnly: true });
 
     expect(
       canvas.lowerCanvasEl.style.width,
@@ -2267,8 +2248,8 @@ describe('Canvas', () => {
   });
 
   it('sets height with backstoreOnly option', () => {
-    canvas.setHeight(123);
-    canvas.setHeight(500, { backstoreOnly: true });
+    canvas.setDimensions({ height: 123 });
+    canvas.setDimensions({ height: 500 }, { backstoreOnly: true });
 
     expect(
       canvas.lowerCanvasEl.style.height,

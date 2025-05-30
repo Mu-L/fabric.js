@@ -125,7 +125,7 @@ export abstract class ITextBehavior<
     toValue: number;
     duration: number;
     delay?: number;
-    onComplete?: TOnAnimationChangeCallback<number, void>;
+    onComplete?: TOnAnimationChangeCallback<number>;
   }) {
     return animate({
       startValue: this._currentCursorOpacity,
@@ -681,11 +681,9 @@ export abstract class ITextBehavior<
 
   /**
    * runs the actual logic that exits from editing state, see {@link exitEditing}
-   * Please use exitEditingImpl, this function was kept to avoid breaking changes.
-   * Will be removed in fabric 7.0
-   * @deprecated use "exitEditingImpl"
+   * But it does not fire events
    */
-  protected _exitEditing() {
+  exitEditingImpl() {
     const hiddenTextarea = this.hiddenTextarea;
     this.selected = false;
     this.isEditing = false;
@@ -698,14 +696,6 @@ export abstract class ITextBehavior<
     this.hiddenTextarea = null;
     this.abortCursorAnimation();
     this.selectionStart !== this.selectionEnd && this.clearContextTop();
-  }
-
-  /**
-   * runs the actual logic that exits from editing state, see {@link exitEditing}
-   * But it does not fire events
-   */
-  exitEditingImpl() {
-    this._exitEditing();
     this.selectionEnd = this.selectionStart;
     this._restoreEditingProps();
     if (this._forceClearCache) {
